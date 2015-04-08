@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>My Wallet</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="app.css">
+    <script src="jquery-2.1.3.js"></script>
+    <script src="angular.min.js"></script>
+</head>
+
+<body ng-app="appModule">
+<div ng-controller="WalletCtrl">
+    <input type="checkbox" id="navbar-checkbox" class="navbar-checkbox">
+        <nav class="menu">
+            <ul>
+                <li>Home</li>
+                <li><a href="" ng-click="reset()">Reset</a></li>
+                <li>View source</li>
+            </ul>
+            <label for="navbar-checkbox" class="navbar-handle"></label>
+        </nav>
+    <section class="wallet">
+        <select name="tot" type="text" ng-model="wallet.totalCurr" ng-init="wallet.totalCurr='£'" ng-change="update()" required>
+            <option value="£">£</option>
+            <option value="€">€</option>
+            <option value="$">$</option>
+        </select>
+        <label>Choose total currency</label>
+
+        <section class="list">
+            <article ng-repeat="item in historic track by $index">{{item.action}} {{item.curr}}{{item.amt|currency:"":2}} on {{item.date | date: "MMM d, y 'at' h:mm a"}}</article>
+        </section>
+
+        <form name="two" ng-submit="submit()" novalidate>
+            <select name="cur" ng-options="curr for curr in ['£', '€', '$']" ng-model="wallet.currency" ng-init="wallet.currency='£'" required>
+            <input name="amt" type="number" ng-model="wallet.amount" required/>
+            <select name="act" ng-model="wallet.action" required>
+                <option selected="selected" value="added">Add ammount</option>
+                <option value="removed">Remove ammount</option>
+            </select>
+            <button ng-disabled="two.$invalid" class="btn">Submit</button>
+        </form>
+
+        <div class="total">
+            Total = <span class="fa" ng-class="{'fa-gbp': wallet.totalCurr==='£', 'fa-eur': wallet.totalCurr==='€', 'fa-usd': wallet.totalCurr==='$'}"></span>{{total|currency:"":2}}
+        </div>
+    </section>
+
+</div>
+</body>
+<script>
+//    localStorage.setItem("itemName", "");
+    angular.module('appModule', [])
+        .controller('WalletCtrl', ['$scope', function ($scope) {
+            $scope.data = {};
+            var url = 'http://www.freecurrencyconverterapi.com/api/v3/convert?q=GBP_USD,GBP_EUR,EUR_USD&compact=y';
+            $.ajax({
+                url: url,
+                dataType: 'jsonp',
+                type: "GET",
+                contentType: "application/json; charset=utf-8"
+            }).done(function(data) {
+                $scope.data = data;
+            }).fail(function(jqXHR, textStatus) {
+                alert(textStatus);
+            });
+
+            wallet = $scope.wallet = {};
+            wallet.totalCurr = !localStorage.dataHisto ? "£" : localStorage.dataHisto.totalCurr;
+            $scope.historic = !localStorage.itemName ? [] :JSON.parse(localStorage.getItem("itemName"));
+            $scope.dataHisto = JSON.parse(localStorage.getItem("dataHisto"));
+            $scope.total = !localStorage.dataHisto ? 0.0 : $scope.dataHisto.total;
+
+            $scope.update = function () {
+                console.log(wallet.oldTotalCurr);
+                if($scope.total){
+                    oldTotal = $scope.total;
+                    console.log(oldTotal);
+                    $scope.total = parseFloat(changeCurr(wallet.totalCurr, wallet.oldTotalCurr, oldTotal));
+                    wallet.oldTotalCurr = wallet.totalCurr;
+                }
+            };
+
+            $scope.submit = function () {
+                wallet.oldTotalCurr = wallet.totalCurr;
+                curr = wallet.currency;
+                amt = wallet.amount;
+                amtTotal = changeCurr(wallet.totalCurr, curr, wallet.amount);
+                date = wallet.date = new Date();
+                console.log($scope.wallet.action);
+                if ($scope.wallet.action === "removed") {
+                    if($scope.total - parseFloat(amtTotal) < 0){
+                        alert("We can't do overdrafts today, try tomorrow");
+                    } else {
+                        $scope.total -= parseFloat(amtTotal);
+                        addToHisto();
+                    }
+                } else {
+                    $scope.total += parseFloat(amtTotal);
+                    addToHisto();
+                }
+
+                function addToHisto(){
+                    $scope.historic.push({"action":wallet.action, "curr":curr, "amt":amt, "date":date});
+                    localStorage.setItem("itemName", JSON.stringify($scope.historic));
+                    localStorage.setItem("dataHisto", JSON.stringify({
+                        "totalCurr":$scope.wallet.totalCurr,
+                        "GBP_EUR": $scope.data.GBP_EUR.val,
+                        "GBP_USD": $scope.data.GBP_USD.val,
+                        "EUR_USD": $scope.data.EUR_USD.val,
+                        "total": $scope.total
+                    }));
+                }
+            };
+
+            function changeCurr(totalCurr, curr, toConv){
+                var amt = toConv;
+                if(totalCurr === "£"){
+                    if(curr === "€"){
+                        return (amt / parseFloat($scope.data.GBP_EUR.val)).toFixed(2);
+                    }
+                    else if(curr === "$"){
+                        return (amt / parseFloat($scope.data.GBP_USD.val)).toFixed(2);
+                    }
+                    else {
+                        return (amt);
+                    }
+                }
+                if(totalCurr === "€"){
+                    if(curr === "£"){
+                        return (amt * parseFloat($scope.data.GBP_EUR.val)).toFixed(2);
+                    }
+                    else if(curr === "$"){
+                        return (amt / parseFloat($scope.data.EUR_USD.val)).toFixed(2);
+                    }
+                    else {
+                        return (amt);
+                    }
+                }
+                if(totalCurr === "$"){
+                    if(curr === "£"){
+                        return (amt * parseFloat($scope.data.GBP_USD.val)).toFixed(2);
+                    }
+                    else if(curr === "€"){
+                        return (amt * parseFloat($scope.data.EUR_USD.val)).toFixed(2);
+                    }
+                    else {
+                        return (amt);
+                    }
+                }
+            }
+
+            $scope.reset = function(){
+                localStorage.removeItem("itemName");
+                localStorage.removeItem("dataHisto");
+                window.location.reload();
+            }
+    }]);
+
+
+</script>
+</html>

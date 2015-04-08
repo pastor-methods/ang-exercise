@@ -1,0 +1,23 @@
+<div ng-controller="WalletCtrl">
+    <li>
+        <ol>Home</ol>
+        <ol>Reset</ol>
+        <ol>View source</ol>
+    </li>
+
+    <section class="list"></section>
+
+    <form ng-submit="submit()">
+        <select type="text" ng-model="wallet.currency">
+            <option value="gbp">£</option>
+            <option value="eur">€</option>
+            <option value="usd">$</option>
+        </select>
+        <input type="text" ng-model="wallet.ammount"/>
+        <select type="text" ng-model="wallet.action">
+            <option value="add">Add ammount</option>
+            <option value="remove">Remove ammount</option>
+        </select>
+        <button class="btn">Submit</button>
+    </form>
+</div>
